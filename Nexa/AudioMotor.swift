@@ -22,10 +22,18 @@ final class AudioMotor {
     private let formatoVoz = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 24000, channels: 1, interleaved: false)!
     private let formato16k = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: 1, interleaved: true)!
 
-    // só a thread de áudio mexe nestes três depois de montado
-    private var conversor: AVAudioConverter?
-    private var formatoMono: AVAudioFormat?
-    private var acumulado: [UInt8] = []
+    /// Estado da captura de UM motor montado. Cada montar() cria o seu e só o tap daquele motor mexe nele,
+    /// então um tap atrasado do motor velho nunca disputa memória com o motor novo (troca de fone, interrupção).
+    private final class Captura {
+        let conversor: AVAudioConverter
+        let mono: AVAudioFormat
+        var acumulado: [UInt8] = []
+        init(conversor: AVAudioConverter, mono: AVAudioFormat) {
+            self.conversor = conversor
+            self.mono = mono
+            acumulado.reserveCapacity(6400)
+        }
+    }
 
     private let trava = NSLock()
     private var geracao = 0
@@ -43,10 +51,16 @@ final class AudioMotor {
     func iniciar() throws {
         guard !ligado else { return }
         let s = AVAudioSession.sharedInstance()
-        try s.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
-        try? s.setPreferredIOBufferDuration(0.02)
-        try s.setActive(true)
-        try montar()
+        do {
+            try s.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+            try? s.setPreferredIOBufferDuration(0.02)
+            try s.setActive(true)
+            try montar()
+        } catch {
+            // não deixa a sessão de gravação ativa à toa quando o motor não sobe
+            try? s.setActive(false, options: .notifyOthersOnDeactivation)
+            throw error
+        }
         ligado = true
         observar()
     }
@@ -79,11 +93,9 @@ final class AudioMotor {
         guard fmt.sampleRate > 0, fmt.channelCount > 0 else { throw Falha.semEntrada }
         guard let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: fmt.sampleRate, channels: 1, interleaved: false),
               let conv = AVAudioConverter(from: mono, to: formato16k) else { throw Falha.semConversor }
-        conversor = conv
-        formatoMono = mono
-        acumulado.removeAll(keepingCapacity: true)
+        let cap = Captura(conversor: conv, mono: mono)
 
-        entrada.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] b, _ in self?.capturou(b) }
+        entrada.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] b, _ in self?.capturou(b, cap) }
         e.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] b, _ in
             guard let self, let ch = b.floatChannelData else { return }
             self.medidor.saida = self.tocando ? Medidor.nivel(ch[0], Int(b.frameLength)) : 0
@@ -103,8 +115,9 @@ final class AudioMotor {
 
     // MARK: microfone
 
-    private func capturou(_ b: AVAudioPCMBuffer) {
-        guard let ch = b.floatChannelData, let mono = formatoMono, let conv = conversor else { return }
+    private func capturou(_ b: AVAudioPCMBuffer, _ c: Captura) {
+        guard let ch = b.floatChannelData else { return }
+        let mono = c.mono, conv = c.conversor
         let n = Int(b.frameLength)
         guard n > 0 else { return }
         medidor.mic = Medidor.nivel(ch[0], n)
@@ -126,11 +139,11 @@ final class AudioMotor {
         guard erro == nil, out.frameLength > 0, let i16 = out.int16ChannelData else { return }
         let bytes = Int(out.frameLength) * 2
         i16[0].withMemoryRebound(to: UInt8.self, capacity: bytes) { p in
-            acumulado.append(contentsOf: UnsafeBufferPointer(start: p, count: bytes))
+            c.acumulado.append(contentsOf: UnsafeBufferPointer(start: p, count: bytes))
         }
-        while acumulado.count >= 3200 {
-            let pedaco = Data(acumulado[0..<3200])
-            acumulado.removeFirst(3200)
+        while c.acumulado.count >= 3200 {
+            let pedaco = Data(c.acumulado[0..<3200])
+            c.acumulado.removeFirst(3200)
             aoCapturar?(pedaco)
         }
     }

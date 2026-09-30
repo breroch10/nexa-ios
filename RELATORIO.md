@@ -52,6 +52,18 @@ Protocolo da ponte respeitado sem mexer nela: `wss://beup-vps.tail76dcad.ts.net:
 - **Teste no aparelho**: nada foi testado num iPhone ainda (sem build). Pontos pra olhar no primeiro teste: volume da voz dela no alto-falante com `.voiceChat`, se o eco some mesmo no viva-voz, e se o Atalho Vocal aparece em Acessibilidade.
 - **Apple ID grátis**: reinstalar a cada 7 dias pelo Sideloadly (ou "Automatic refresh").
 
+## Verificação independente (29/09, 22h20)
+
+- **Bloqueio confirmado na página do build**: anotação do GitHub "The job was not started because recent account payments have failed or your spending limit needs to be increased". Não é erro no workflow (YAML válido). Repositório segue privado. Nenhum build rodou, custo zero.
+- **Código lido inteiro** contra a tarefa e o protocolo da ponte (`atender` em ponte.py, conversa.js): áudio de ida PCM16 16 kHz em 3200 bytes, volta PCM16 24 kHz em fila, `Origin` na lista, `interrompido` para a voz na hora, eventos `pronto/ouvi/disse/pensando/fim/erro/tela/abrir/reels/criacao` tratados, zero travessão no texto da interface.
+- **Corrigido**:
+  1. Captura do microfone: o estado da conversão (conversor e sobra de bytes) era compartilhado entre o motor velho e o novo quando o áudio é refeito (fone entrando, ligação). Um tap atrasado podia mexer no mesmo array que a main estava zerando, risco de crash. Agora cada motor tem o seu.
+  2. Se o motor de áudio não sobe, a sessão de gravação era deixada ativa. Agora é desligada no erro.
+  3. App Intent: além do `scenePhase`, o app escuta `didBecomeActive` pra começar a ouvir mesmo quando abre a frio e o `scenePhase` já nasce ativo.
+  4. `compilar.sh` pega só o build que ele mesmo disparou (antes podia pegar um build de push ou um anterior) e confere que o `.ipa` tem `Payload/Nexa.app/Nexa`.
+- **Checagem de tipos** de novo depois das correções (Swift 6.3, SDK iOS 26 modo Catalyst, alvo iOS 17): zero erro.
+- **Pra olhar no primeiro build de verdade**: a frase só "Nexa" no `AppShortcutsProvider` (se o processador de App Intents do Xcode reclamar, tirar essa frase; o Atalho Vocal continua funcionando porque ele usa a ação, não a frase) e se o motor com processamento de voz dispara troca de configuração em sequência logo ao ligar (o app aguenta 4 refeitos em 10 s e depois avisa "O áudio parou").
+
 ## Arquivos
 
 - `/Volumes/Extreme SSD Breno/Projetos Beup/nexa-ios/Nexa/` (código Swift, Info.plist, ícone)

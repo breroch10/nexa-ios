@@ -56,6 +56,11 @@ final class Conversa: ObservableObject {
         ponte.aoTexto = { [weak self] s in self?.recebeu(texto: s) }
         ponte.aoAudio = { [weak self] d in self?.recebeu(audio: d) }
         ponte.aoFechar = { [weak self] c, r in self?.caiu(codigo: c, razao: r) }
+        // Além do scenePhase: na abertura a frio pelo App Intent o scenePhase pode já nascer ativo e não avisar a mudança.
+        // Chamar ficouAtivo() duas vezes não faz mal (as duas pendências se zeram na primeira).
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { Conversa.shared.ficouAtivo() }
+        }
     }
 
     // MARK: ligar e desligar

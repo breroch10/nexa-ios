@@ -41,6 +41,7 @@ final class Conversa: ObservableObject {
     private var ligarAoAtivar = false
     private var acaoPendente: URL?
     private var avisoN = 0
+    private var sessaoN = 0                      // cada ligar() ganha um número; um abrir() velho não mexe na conversa nova
     private let tato = UIImpactFeedbackGenerator(style: .soft)
 
     /// 15 minutos sem ninguém falar: encerra (bateria e privacidade).
@@ -91,12 +92,14 @@ final class Conversa: ObservableObject {
         legenda = ""; detalhe = ""; destaque = nil
         estado = .conectando
         tato.impactOccurred()
-        Task { await self.abrir() }
+        sessaoN += 1
+        let n = sessaoN
+        Task { await self.abrir(n) }
     }
 
-    private func abrir() async {
+    private func abrir(_ n: Int) async {
         let pode = await Conversa.permissaoMic()
-        guard ativa else { return }
+        guard ativa, n == sessaoN else { return }
         guard pode else {
             desligar(motivo: "Microfone bloqueado. Abra Ajustes, Nexa, e libere o microfone.", erro: true)
             return

@@ -1,0 +1,9 @@
+# gerado pelo XcodeGen no CI
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+build/
+pacote/
+*.ipa
+.DS_Store
+xcuserdata/

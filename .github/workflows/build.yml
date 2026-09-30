@@ -1,0 +1,66 @@
+name: Build Nexa
+
+# Roda só quando muda código do app (README e relatório não gastam minutos de macOS).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Nexa/**"
+      - "project.yml"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build-nexa
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Gerar o projeto (XcodeGen)
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Compilar (sem assinatura)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Nexa.xcodeproj \
+            -scheme Nexa \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/Nexa.xcarchive" \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Empacotar Nexa.ipa
+        run: |
+          APP="$RUNNER_TEMP/Nexa.xcarchive/Products/Applications/Nexa.app"
+          test -d "$APP"
+          plutil -p "$APP/Info.plist" | grep -E "CFBundleIdentifier|UIBackgroundModes|audio|MinimumOSVersion" || true
+          ls "$APP"
+          mkdir -p pacote/Payload
+          cp -R "$APP" pacote/Payload/
+          (cd pacote && zip -qry ../Nexa.ipa Payload)
+          ls -la Nexa.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nexa
+          path: Nexa.ipa
+          if-no-files-found: error
+          retention-days: 30

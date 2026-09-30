@@ -1,0 +1,43 @@
+name: Nexa
+options:
+  bundleIdPrefix: com.beup
+  developmentLanguage: pt-BR
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Nexa:
+    type: application
+    platform: iOS
+    sources:
+      - path: Nexa
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.beup.nexa
+        PRODUCT_NAME: Nexa
+        INFOPLIST_FILE: Nexa/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+schemes:
+  Nexa:
+    build:
+      targets:
+        Nexa: all
+    run:
+      config: Debug
+    archive:
+      config: Release
